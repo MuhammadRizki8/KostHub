@@ -1,0 +1,39 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Coverage reports and test results
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+
+# MyPy cache
+.mypy_cache/
+
+# Environment files (pastikan file .env tidak ikut ter-commit karena berisi data sensitif)
+.env
+.env.*
+
+# VSCode settings
+.vscode/
