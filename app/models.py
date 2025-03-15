@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DECIMAL, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -15,6 +15,7 @@ class User(Base):
     kosts = relationship("Kost", back_populates="pemilik")
     favorit = relationship("Favorit", back_populates="pencari")
 
+
 class Kost(Base):
     __tablename__ = "kost"
     
@@ -23,13 +24,21 @@ class Kost(Base):
     nama_kost = Column(String(255), nullable=False)
     alamat = Column(Text, nullable=False)
     deskripsi = Column(Text, nullable=False)
-    harga_sewa = Column(DECIMAL(10,2), nullable=False)
-    luas = Column(String(50), nullable=False)
+    harga_sewa = Column(DECIMAL(15, 2), nullable=False)
+    luas = Column(Integer, nullable=False)  # Luas bangunan (m²)
+    luas_tanah = Column(Integer, nullable=False)  # Luas tanah (m²)
+    longitude = Column(Float, nullable=False)
+    latitude = Column(Float, nullable=False)
+    status_properti = Column(String(50), nullable=False)  # Misal: 'Sewa', 'Jual'
+    jenis_sertifikat = Column(String(100), nullable=False)  # Misal: 'SHM', 'HGB'
+    dokumen_properti = Column(Text, nullable=True)  # URL gambar properti utama
     
+    # Relasi
     pemilik = relationship("User", back_populates="kosts")
     gambar = relationship("GambarKost", back_populates="kost")
     favorit = relationship("Favorit", back_populates="kost")
     fasilitas = relationship("Fasilitas", secondary="kost_fasilitas", back_populates="kosts")
+
 
 class Fasilitas(Base):
     __tablename__ = "fasilitas"
@@ -39,11 +48,13 @@ class Fasilitas(Base):
     
     kosts = relationship("Kost", secondary="kost_fasilitas", back_populates="fasilitas")
 
+
 class KostFasilitas(Base):
     __tablename__ = "kost_fasilitas"
     
     id_kost = Column(Integer, ForeignKey("kost.id_kost"), primary_key=True)
     id_fasilitas = Column(Integer, ForeignKey("fasilitas.id_fasilitas"), primary_key=True)
+
 
 class GambarKost(Base):
     __tablename__ = "gambar_kost"
@@ -53,6 +64,7 @@ class GambarKost(Base):
     url_gambar = Column(Text, nullable=False)
     
     kost = relationship("Kost", back_populates="gambar")
+
 
 class Favorit(Base):
     __tablename__ = "favorit"
