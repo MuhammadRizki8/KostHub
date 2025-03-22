@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, condecimal, conint
+from pydantic import BaseModel, EmailStr, condecimal, conint, Field
 from typing import List, Optional
 from enum import Enum
 
@@ -110,10 +110,11 @@ class KostUpdate(BaseModel):
 
 class KostResponse(KostBase):
     id_kost: int
-    gambar: List[GambarKostResponse] = []  # Kost bisa punya banyak gambar
-    fasilitas: List[FasilitasResponse] = []  # Menampung objek fasilitas, bukan hanya ID
+    gambar: List[GambarKostResponse] = Field(default_factory=list, alias="gambar_kost")
+    fasilitas: List[FasilitasResponse] = []  # Menampung objek fasilitas
 
     class Config:
-        from_attributes = True
+        orm_mode = True
+        allow_population_by_field_name = True
 
 
