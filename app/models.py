@@ -1,77 +1,87 @@
-from sqlalchemy import Column, Integer, String, Text, DECIMAL, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, Enum, Double
 from sqlalchemy.orm import relationship
-from .database import Base
+from sqlalchemy.ext.declarative import declarative_base
+import enum
 
-class User(Base):
-    __tablename__ = "users"
-    
-    id_user = Column(Integer, primary_key=True, index=True)
-    nama = Column(String(255), nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
-    password = Column(Text, nullable=False)
-    role = Column(String(10), nullable=False)  # Pastikan nilainya 'pemilik' atau 'pencari'
-    
-    # Relasi dengan kost dan favorit
-    kosts = relationship("Kost", back_populates="pemilik")
-    favorit = relationship("Favorit", back_populates="pencari")
+Base = declarative_base()
 
+class StatusPropertiEnum(enum.Enum):
+    SEWA = "Sewa"
+    JUAL = "Jual"
+
+class JenisSertifikatEnum(enum.Enum):
+    SHM = "Sertifikat Hak Milik (SHM)"
+    SHGB = "Sertifikat Hak Guna Bangunan (SHGB)"
+    SHGU = "Sertifikat Hak Guna Usaha (SHGU)"
+    HPL = "Sertifikat Hak Pengelolaan (HPL)"
+    SHS = "Sertifikat Hak Sewa (SHS)"
+    SHP = "Sertifikat Hak Pakai (SHP)"
+    SHM_ADAT = "Sertifikat Hak Masyarakat Adat (SHM Adat)"
 
 class Kost(Base):
-    __tablename__ = "kost"
+    __tablename__ = 'kost'
     
-    id_kost = Column(Integer, primary_key=True, index=True)
-    id_pemilik = Column(Integer, ForeignKey("users.id_user"), nullable=False)
+    id_kost = Column(Integer, primary_key=True)
     nama_kost = Column(String(255), nullable=False)
     alamat = Column(Text, nullable=False)
-    deskripsi = Column(Text, nullable=False)
-    harga_sewa = Column(DECIMAL(15, 2), nullable=False)
-    luas = Column(Integer, nullable=False)  # Luas bangunan (m²)
-    luas_tanah = Column(Integer, nullable=False)  # Luas tanah (m²)
-    longitude = Column(Float, nullable=False)
-    latitude = Column(Float, nullable=False)
-    status_properti = Column(String(50), nullable=False)  # Misal: 'Sewa', 'Jual'
-    jenis_sertifikat = Column(String(100), nullable=False)  # Misal: 'SHM', 'HGB'
-    dokumen_properti = Column(Text, nullable=True)  # URL gambar properti utama
+    deskripsi = Column(Text, nullable=True)  # Deskripsi boleh NULL
+    harga_sewa = Column(Numeric(10, 2), nullable=False)
+    luas = Column(Integer, nullable=False)
+    status_properti = Column(Enum(StatusPropertiEnum, name="status_properti_enum", native_enum=True, values_callable=lambda enum_cls: [e.value for e in enum_cls]))
+    jenis_sertifikat = Column(Enum(JenisSertifikatEnum, name="jenis_sertifikat_enum", native_enum=True, values_callable=lambda enum_cls: [e.value for e in enum_cls]))
+    luas_tanah = Column(Integer, nullable=False)
+    longitude = Column(Double, nullable=False)  # Tidak boleh NULL
+    latitude = Column(Double, nullable=False)  # Tidak boleh NULL
+
+    gambar_kost = relationship("GambarKost",back_populates="kost",cascade="all, delete-orphan",lazy="joined")
+    kost_fasilitas = relationship("KostFasilitas", back_populates="kost", cascade="all, delete")
+    favorits = relationship("Favorit", back_populates="kost", cascade="all, delete")
+    fasilitas = relationship("Fasilitas", secondary="kost_fasilitas", backref="kosts")  # Relasi ke fasilitas
     
-    # Relasi
-    pemilik = relationship("User", back_populates="kosts")
-    gambar = relationship("GambarKost", back_populates="kost")
-    favorit = relationship("Favorit", back_populates="kost")
-    fasilitas = relationship("Fasilitas", secondary="kost_fasilitas", back_populates="kosts")
-
-
-class Fasilitas(Base):
-    __tablename__ = "fasilitas"
-    
-    id_fasilitas = Column(Integer, primary_key=True, index=True)
-    nama_fasilitas = Column(String(255), nullable=False)
-    
-    kosts = relationship("Kost", secondary="kost_fasilitas", back_populates="fasilitas")
-
-
-class KostFasilitas(Base):
-    __tablename__ = "kost_fasilitas"
-    
-    id_kost = Column(Integer, ForeignKey("kost.id_kost"), primary_key=True)
-    id_fasilitas = Column(Integer, ForeignKey("fasilitas.id_fasilitas"), primary_key=True)
-
-
 class GambarKost(Base):
     __tablename__ = "gambar_kost"
     
     id_gambar = Column(Integer, primary_key=True, index=True)
-    id_kost = Column(Integer, ForeignKey("kost.id_kost"), nullable=False)
-    url_gambar = Column(Text, nullable=False)
-    
-    kost = relationship("Kost", back_populates="gambar")
+    url_gambar = Column(String, nullable=False)
+    id_kost = Column(Integer, ForeignKey("kost.id_kost", ondelete="CASCADE"))
 
+    kost = relationship("Kost", back_populates="gambar_kost")
+
+
+class Fasilitas(Base):
+    __tablename__ = 'fasilitas'
+    
+    id_fasilitas = Column(Integer, primary_key=True)
+    nama_fasilitas = Column(String(255), nullable=False, unique=True)
+    
+    kost_fasilitas = relationship("KostFasilitas", back_populates="fasilitas", cascade="all, delete")
+
+class KostFasilitas(Base):
+    __tablename__ = 'kost_fasilitas'
+    
+    id_kost = Column(Integer, ForeignKey('kost.id_kost', ondelete='CASCADE'), primary_key=True)
+    id_fasilitas = Column(Integer, ForeignKey('fasilitas.id_fasilitas', ondelete='CASCADE'), primary_key=True)
+    
+    kost = relationship("Kost", back_populates="kost_fasilitas")
+    fasilitas = relationship("Fasilitas", back_populates="kost_fasilitas")
 
 class Favorit(Base):
-    __tablename__ = "favorit"
+    __tablename__ = 'favorit'
     
-    id_favorit = Column(Integer, primary_key=True, index=True)
-    id_pencari = Column(Integer, ForeignKey("users.id_user"), nullable=False)
-    id_kost = Column(Integer, ForeignKey("kost.id_kost"), nullable=False)
+    id_favorit = Column(Integer, primary_key=True)
+    id_pencari = Column(Integer, ForeignKey('users.id_user', ondelete='CASCADE'), nullable=False)
+    id_kost = Column(Integer, ForeignKey('kost.id_kost', ondelete='CASCADE'), nullable=False)
     
-    pencari = relationship("User", back_populates="favorit")
-    kost = relationship("Kost", back_populates="favorit")
+    kost = relationship("Kost", back_populates="favorits")
+    pencari = relationship("User", back_populates="favorits")
+
+class User(Base):
+    __tablename__ = 'users'
+    
+    id_user = Column(Integer, primary_key=True)
+    nama = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, unique=True)
+    password = Column(Text, nullable=False)
+    role = Column(String(10), nullable=False)
+    
+    favorits = relationship("Favorit", back_populates="pencari", cascade="all, delete")

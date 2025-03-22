@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.database import engine, Base
 from app import models
-from app.routers import users, kost
+from app.routers import users, kost, fasilitas
 
 app = FastAPI(title="KostHub API", version="0.1")
 
@@ -11,6 +11,7 @@ Base.metadata.create_all(bind=engine)
 # Include routers
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(kost.router, prefix="/kost", tags=["Kost"])
+app.include_router(fasilitas.router, prefix="/fasilitas", tags=["Fasilitas"])
 
 @app.get("/")
 def root():
