@@ -136,8 +136,10 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
             db.commit()
             db.refresh(new_kost)
 
-            # Fasilitas (dipisah koma)
-            fasilitas_list = set(map(lambda x: x.strip(), str(row.get("Fasilitas", "")).split(",")))
+            # Fasilitas (dipisah koma), skip item pertama
+            raw_fasilitas = str(row.get("Fasilitas", ""))
+            raw_fasilitas_list = [x.strip() for x in raw_fasilitas.split(",") if x.strip()]
+            fasilitas_list = raw_fasilitas_list[1:] if len(raw_fasilitas_list) > 1 else []
             for fasilitas_nama in fasilitas_list:
                 if not fasilitas_nama:
                     continue
