@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, status
 from sqlalchemy.orm import Session, joinedload
 from app import models, schemas
 from app.database import get_db
@@ -10,51 +10,75 @@ router = APIRouter(tags=["Kost"])
 # =======================
 # Create Kost
 # =======================
-@router.post("/", response_model=schemas.KostResponse)
+@router.post("/", response_model=schemas.KostResponseWrapper, status_code=status.HTTP_201_CREATED)
 def create_kost(kost: schemas.KostCreate, db: Session = Depends(get_db)):
-    try:
-        # 1. Buat objek Kost baru dan flush untuk mendapatkan id
-        new_kost = models.Kost(
-            nama_kost=kost.nama_kost,
-            alamat=kost.alamat,
-            deskripsi=kost.deskripsi,
-            harga_sewa=kost.harga_sewa,
-            luas=kost.luas,
-            luas_tanah=kost.luas_tanah,
-            status_properti=kost.status_properti,
-            jenis_sertifikat=kost.jenis_sertifikat,
-            longitude=kost.longitude,
-            latitude=kost.latitude
+    # Validasi fasilitas
+    fasilitas_ids = kost.fasilitas
+    fasilitas_db = db.query(models.Fasilitas).filter(models.Fasilitas.id_fasilitas.in_(fasilitas_ids)).all()
+    if len(fasilitas_db) != len(fasilitas_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "InvalidFacilities",
+                "message": "One or more facility IDs do not exist."
+            }
         )
+
+    # Buat objek kost
+    new_kost = models.Kost(
+        nama_kost=kost.nama_kost,
+        alamat=kost.alamat,
+        deskripsi=kost.deskripsi,
+        harga_sewa=kost.harga_sewa,
+        luas=kost.luas,
+        panjang=kost.panjang,
+        lebar=kost.lebar,
+        luas_tanah=kost.luas_tanah,
+        status_properti=kost.status_properti,
+        jenis_sertifikat=kost.jenis_sertifikat,
+        longitude=kost.longitude,
+        latitude=kost.latitude
+    )
+
+    try:
         db.add(new_kost)
-        db.flush()  # mendapatkan new_kost.id_kost tanpa commit
+        db.flush()  # agar dapat ID sebelum commit
 
-        # 2. Validasi fasilitas & simpan relasi di tabel kost_fasilitas
-        fasilitas_list = db.query(models.Fasilitas).filter(
-            models.Fasilitas.id_fasilitas.in_(kost.fasilitas)
-        ).all()
-        if len(fasilitas_list) != len(kost.fasilitas):
-            raise HTTPException(status_code=400, detail="Satu atau lebih fasilitas tidak ditemukan")
-        for fasilitas in fasilitas_list:
-            db.add(models.KostFasilitas(id_kost=new_kost.id_kost, id_fasilitas=fasilitas.id_fasilitas))
+        # Relasi fasilitas
+        for fasilitas in fasilitas_db:
+            db.add(models.KostFasilitas(
+                id_kost=new_kost.id_kost,
+                id_fasilitas=fasilitas.id_fasilitas
+            ))
 
-        # 3. Simpan gambar kost jika ada
-        gambar_list = []
-        for url in kost.gambar:  # kost.gambar merupakan list URL
+        # Tambah gambar
+        gambar_objs = []
+        for url in kost.gambar:
             gambar = models.GambarKost(id_kost=new_kost.id_kost, url_gambar=url)
             db.add(gambar)
-            gambar_list.append(gambar)
+            gambar_objs.append(gambar)
 
         db.commit()
+
+        # Refresh & isi relasi
         db.refresh(new_kost)
+        new_kost.gambar_kost = gambar_objs
+        new_kost.fasilitas = fasilitas_db
+
+        return {
+            "message": "Kost successfully created.",
+            "data": schemas.KostResponse.from_orm(new_kost)
+        }
+
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    # Menambahkan gambar ke properti response (jika perlu)
-    new_kost.gambar_kosts = gambar_list
-    return new_kost
-
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "ServerError",
+                "message": f"Unexpected error: {str(e)}"
+            }
+        )
 # =======================
 # Get Kost by ID
 # =======================

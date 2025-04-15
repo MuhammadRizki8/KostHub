@@ -85,6 +85,8 @@ class KostBase(BaseModel):
     deskripsi: Optional[str] = None  # Deskripsi boleh NULL
     harga_sewa: condecimal(max_digits=10, decimal_places=2)
     luas: conint(gt=0)  # Luas tidak boleh 0 atau negatif
+    panjang: float
+    lebar: float
     status_properti: StatusPropertiEnum
     jenis_sertifikat: Optional[JenisSertifikatEnum] = None
     luas_tanah: Optional[conint(gt=0)] = None
@@ -111,10 +113,12 @@ class KostUpdate(BaseModel):
 class KostResponse(KostBase):
     id_kost: int
     gambar: List[GambarKostResponse] = Field(default_factory=list, alias="gambar_kost")
-    fasilitas: List[FasilitasResponse] = []  # Menampung objek fasilitas
+    fasilitas: List[FasilitasResponse] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         allow_population_by_field_name = True
 
-
+class KostResponseWrapper(BaseModel):
+    message: str
+    data: KostResponse

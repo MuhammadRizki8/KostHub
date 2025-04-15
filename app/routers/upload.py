@@ -2,37 +2,28 @@ from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 import json
-from app.database import get_db
-from app import models, schemas
-from app.models import StatusPropertiEnum, JenisSertifikatEnum
 import pandas as pd
 import re
+from app.database import get_db
+from app import models
+from app.models import StatusPropertiEnum, JenisSertifikatEnum
 
 router = APIRouter(
     prefix="/upload",
     tags=["Upload"]
 )
 
-def extract_luas_from_fasilitas(fasilitas_str: str) -> int:
-    """
-    Ekstrak ukuran dari string fasilitas, misalnya:
-    - "3 x 3 meter"
-    - "3x3m"
-    - "Ukuran 3×3 meter"
-    """
-    # Normalisasi ke huruf kecil & hapus spasi ekstra
-    fasilitas_str = fasilitas_str.lower().strip()
-
-    # Cari pola "angka x angka"
-    match = re.search(r"(\d+)\s*[x×]\s*(\d+)", fasilitas_str)
+def extract_panjang_lebar_luas(fasilitas_str: str):
+    fasilitas_str = fasilitas_str.lower()
+    match = re.search(r"(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)", fasilitas_str)
     if match:
         try:
-            panjang = int(match.group(1))
-            lebar = int(match.group(2))
-            return panjang * lebar
-        except:
-            return 0
-    return 0
+            panjang = float(match.group(1))
+            lebar = float(match.group(2))
+            return panjang, lebar, panjang * lebar
+        except ValueError:
+            pass
+    return None, None, None
 
 @router.post("/geojson/")
 def upload_geojson(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -42,72 +33,68 @@ def upload_geojson(file: UploadFile = File(...), db: Session = Depends(get_db)):
     try:
         contents = file.file.read().decode("utf-8")
         data = json.loads(contents)
-        
+
         if "features" not in data:
             raise HTTPException(status_code=400, detail="Invalid GeoJSON structure.")
         
         for feature in data["features"]:
             geometry = feature.get("geometry", {})
             properties = feature.get("properties", {})
-            
-            status_properti = properties.get("Status Properti", "Sewa")
-            jenis_sertifikat = properties.get("Jenis Sertifikat", "Sertifikat Hak Milik (SHM)")
-            
-            if status_properti not in StatusPropertiEnum._value2member_map_:
-                raise HTTPException(status_code=400, detail=f"Invalid status properti: {status_properti}")
-            
-            if jenis_sertifikat not in JenisSertifikatEnum._value2member_map_:
-                raise HTTPException(status_code=400, detail=f"Invalid jenis sertifikat: {jenis_sertifikat}")
-            
-            new_kost = models.Kost(
+
+            status = properties.get("Status Properti", "Sewa")
+            sertifikat = properties.get("Jenis Sertifikat", "Sertifikat Hak Milik (SHM)")
+
+            if status not in StatusPropertiEnum._value2member_map_:
+                raise HTTPException(status_code=400, detail=f"Invalid status properti: {status}")
+            if sertifikat not in JenisSertifikatEnum._value2member_map_:
+                raise HTTPException(status_code=400, detail=f"Invalid jenis sertifikat: {sertifikat}")
+
+            kost = models.Kost(
                 nama_kost=properties.get("Nama Properti", "Unnamed"),
                 alamat=properties.get("Alamat Lengkap", ""),
-                deskripsi=properties.get("Status Properti", ""),
+                deskripsi=status,
                 harga_sewa=properties.get("Harga Properti", 0),
                 luas=properties.get("Luas Bangunan (m²)", 0),
                 luas_tanah=properties.get("Luas Tanah (m²)", 0),
-                jenis_sertifikat=jenis_sertifikat,
+                jenis_sertifikat=sertifikat,
                 longitude=geometry.get("coordinates", [0, 0])[0],
                 latitude=geometry.get("coordinates", [0, 0])[1],
-                status_properti=status_properti
+                status_properti=status
             )
-            db.add(new_kost)
+            db.add(kost)
             db.commit()
-            db.refresh(new_kost)
+            db.refresh(kost)
 
             fasilitas_list = properties.get("Fasilitas", "").split("\n")
-            for fasilitas_nama in fasilitas_list:
-                fasilitas_nama = fasilitas_nama.strip()
-                if not fasilitas_nama:
+            for nama_fasilitas in fasilitas_list:
+                nama_fasilitas = nama_fasilitas.strip()
+                if not nama_fasilitas:
                     continue
-                
-                fasilitas = db.query(models.Fasilitas).filter(models.Fasilitas.nama_fasilitas == fasilitas_nama).first()
+
+                fasilitas = db.query(models.Fasilitas).filter_by(nama_fasilitas=nama_fasilitas).first()
                 if not fasilitas:
-                    fasilitas = models.Fasilitas(nama_fasilitas=fasilitas_nama)
+                    fasilitas = models.Fasilitas(nama_fasilitas=nama_fasilitas)
                     db.add(fasilitas)
                     db.commit()
                     db.refresh(fasilitas)
-                
-                kost_fasilitas = models.KostFasilitas(id_kost=new_kost.id_kost, id_fasilitas=fasilitas.id_fasilitas)
+
+                kost_fasilitas = models.KostFasilitas(id_kost=kost.id_kost, id_fasilitas=fasilitas.id_fasilitas)
                 db.add(kost_fasilitas)
-            
             db.commit()
-        
+
         return {"message": "GeoJSON uploaded and processed successfully"}
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
-    
+
 @router.post("/excel/")
 async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload a .xlsx file.")
     
     try:
-        # Baca Excel file ke DataFrame
         contents = await file.read()
-        excel_data = BytesIO(contents)
-        df = pd.read_excel(excel_data)
+        df = pd.read_excel(BytesIO(contents))
 
         for _, row in df.iterrows():
             nama_properti = str(row.get("Nama Properti", "Unnamed"))
@@ -115,63 +102,58 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
             harga = int(row.get("Harga Properti", 0))
             latitude = float(row.get("latitude", 0.0))
             longitude = float(row.get("longitude", 0.0))
-            
             fasilitas_raw = str(row.get("Fasilitas", ""))
-            luas = extract_luas_from_fasilitas(fasilitas_raw)
+            gambar_raw = str(row.get("gambar", ""))
 
+            panjang, lebar, luas = None, None, None
+            fasilitas_list = []
 
-            # Simpan data kost
-            new_kost = models.Kost(
+            for item in fasilitas_raw.split(","):
+                item = item.strip()
+                if not item:
+                    continue
+                p, l, luas_item = extract_panjang_lebar_luas(item)
+                if p and l:
+                    panjang, lebar, luas = p, l, luas_item
+                else:
+                    fasilitas_list.append(item)
+
+            kost = models.Kost(
                 nama_kost=nama_properti,
                 alamat=alamat,
                 harga_sewa=harga,
                 latitude=latitude,
                 longitude=longitude,
-                luas=luas,
-                luas_tanah=luas,
-                status_properti="Sewa",  # default
-                jenis_sertifikat="Sertifikat Hak Milik (SHM)"  # default
+                luas=luas or 0,
+                panjang=panjang or 0,
+                lebar=lebar or 0,
+                luas_tanah=luas or 0,
+                status_properti="Sewa",
+                jenis_sertifikat="Sertifikat Hak Milik (SHM)"
             )
-            db.add(new_kost)
+            db.add(kost)
             db.commit()
-            db.refresh(new_kost)
+            db.refresh(kost)
 
-            # Fasilitas (dipisah koma), skip item pertama
-            raw_fasilitas = str(row.get("Fasilitas", ""))
-            raw_fasilitas_list = [x.strip() for x in raw_fasilitas.split(",") if x.strip()]
-            fasilitas_list = raw_fasilitas_list[1:] if len(raw_fasilitas_list) > 1 else []
-            for fasilitas_nama in fasilitas_list:
-                if not fasilitas_nama:
-                    continue
-
-                fasilitas = db.query(models.Fasilitas).filter_by(nama_fasilitas=fasilitas_nama).first()
+            for nama_fasilitas in fasilitas_list:
+                fasilitas = db.query(models.Fasilitas).filter_by(nama_fasilitas=nama_fasilitas).first()
                 if not fasilitas:
-                    fasilitas = models.Fasilitas(nama_fasilitas=fasilitas_nama)
+                    fasilitas = models.Fasilitas(nama_fasilitas=nama_fasilitas)
                     db.add(fasilitas)
                     db.commit()
                     db.refresh(fasilitas)
 
-                kost_fasilitas = db.query(models.KostFasilitas).filter_by(
-                    id_kost=new_kost.id_kost, id_fasilitas=fasilitas.id_fasilitas
-                ).first()
+                if not db.query(models.KostFasilitas).filter_by(id_kost=kost.id_kost, id_fasilitas=fasilitas.id_fasilitas).first():
+                    db.add(models.KostFasilitas(id_kost=kost.id_kost, id_fasilitas=fasilitas.id_fasilitas))
 
-                if not kost_fasilitas:
-                    kost_fasilitas = models.KostFasilitas(id_kost=new_kost.id_kost, id_fasilitas=fasilitas.id_fasilitas)
-                    db.add(kost_fasilitas)
-
-            # Gambar (dipisah koma)
-            gambar_list = str(row.get("gambar", "")).split(",")
-            for gambar_url in gambar_list:
-                gambar_url = gambar_url.strip()
-                if not gambar_url:
-                    continue
-
-                gambar = models.GambarKost(id_kost=new_kost.id_kost, url_gambar=gambar_url)
-                db.add(gambar)
+            for url in gambar_raw.split(","):
+                url = url.strip()
+                if url:
+                    db.add(models.GambarKost(id_kost=kost.id_kost, url_gambar=url))
 
             db.commit()
 
         return {"message": "Excel uploaded and processed successfully"}
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")

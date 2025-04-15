@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, Enum, Double
+from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, Enum, Double, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 import enum
@@ -24,9 +24,11 @@ class Kost(Base):
     id_kost = Column(Integer, primary_key=True)
     nama_kost = Column(String(255), nullable=False)
     alamat = Column(Text, nullable=False)
-    deskripsi = Column(Text, nullable=True)  # Deskripsi boleh NULL
+    deskripsi = Column(Text, nullable=True)  
     harga_sewa = Column(Numeric(10, 2), nullable=False)
     luas = Column(Integer, nullable=False)
+    panjang = Column(Float, nullable=True) 
+    lebar = Column(Float, nullable=True) 
     status_properti = Column(Enum(StatusPropertiEnum, name="status_properti_enum", native_enum=True, values_callable=lambda enum_cls: [e.value for e in enum_cls]))
     jenis_sertifikat = Column(Enum(JenisSertifikatEnum, name="jenis_sertifikat_enum", native_enum=True, values_callable=lambda enum_cls: [e.value for e in enum_cls]))
     luas_tanah = Column(Integer, nullable=False)
