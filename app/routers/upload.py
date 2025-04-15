@@ -117,6 +117,9 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
                     panjang, lebar, luas = p, l, luas_item
                 else:
                     fasilitas_list.append(item)
+            
+            # Hapus duplikat sambil menjaga urutan
+            fasilitas_list = list(dict.fromkeys(fasilitas_list))
 
             kost = models.Kost(
                 nama_kost=nama_properti,
