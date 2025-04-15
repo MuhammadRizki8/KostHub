@@ -104,6 +104,8 @@ class KostUpdate(BaseModel):
     deskripsi: Optional[str]
     harga_sewa: Optional[float]
     luas: Optional[int]
+    panjang: Optional[float]
+    lebar: Optional[float]
     luas_tanah: Optional[int]
     status_properti: Optional[str]
     jenis_sertifikat: Optional[str]
@@ -119,6 +121,4 @@ class KostResponse(KostBase):
         from_attributes = True
         allow_population_by_field_name = True
 
-class KostResponseWrapper(BaseModel):
-    message: str
-    data: KostResponse
+
