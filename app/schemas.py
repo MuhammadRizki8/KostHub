@@ -32,6 +32,10 @@ class UserCreate(UserBase):
     password: str
     role: str  # 'pemilik' atau 'pencari'
 
+class UserLogin(BaseModel):
+    email:EmailStr
+    password: str
+
 class UserResponse(UserBase):
     id_user: int
     role: str
