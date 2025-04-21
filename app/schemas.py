@@ -125,4 +125,9 @@ class KostResponse(KostBase):
         from_attributes = True
         allow_population_by_field_name = True
 
-
+class PredictPrice(BaseModel):
+    latitude: Optional[float]
+    longitude: Optional[float]
+    panjang: Optional[float]
+    lebar: Optional[float]
+    fasilitas: Optional[list[str]]
