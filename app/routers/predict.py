@@ -7,14 +7,23 @@ import joblib
 from collections import defaultdict
 import pandas as pd
 import numpy as np
+from scipy.spatial.distance import euclidean
 
 router = APIRouter()
 
 
 # load data and model
 df_public_places = pd.read_csv("dataset/public_places.csv", delimiter=';')
+# load model prediksi
 model = joblib.load("model/xgb_model.pkl")
 feature_columns = joblib.load("model/xgb_model_columns.pkl")
+# load scaler and feature for recommender
+scaler_facility = joblib.load("model/recommender/scaler/scaler_facility_feature.pkl")
+scaler_location = joblib.load("model/recommender/scaler/scaler_location_feature.pkl")
+scaler_price = joblib.load("model/recommender/scaler/scaler_price_feature.pkl")
+loaded_facility = np.load("model/recommender/feature/facility_feature.npy")
+loaded_location = np.load("model/recommender/feature/location_feature.npy")
+loaded_price = np.load("model/recommender/feature/price_feature.npy")
 
 # group public places
 places_by_type = defaultdict(list)
@@ -69,6 +78,11 @@ facility_groups = {
     }
 }
 
+# static data
+facility_features = ['panjang', 'lebar', 'ac', 'air panas', 'bak mandi', 'bantal', 'bathtub', 'cctv', 'cermin', 'cleaning service', 'dapur', 'dispenser', 'ember mandi', 'guling', 'jemuran', 'kamar mandi dalam', 'kamar mandi luar', 'kartu akses', 'kasur', 'kipas angin', 'kloset duduk', 'kloset jongkok', 'kulkas', 'kursi', 'laundry', 'lemari baju', 'locker', 'meja', 'meja makan', 'microwave', 'mushola', 'parkir mobil', 'parkir motor', 'parkir sepeda', 'penjaga kos', 'rice cooker', 'ruang santai', 'shower', 'sofa', 'taman', 'termasuk listrik', 'tv', 'wastafel', 'wifi', 'luas', 'total_facilities', 'jumlah_fasilitas_premium', 'jumlah_fasilitas_non_premium', 'jumlah_fasilitas_netral', 'jumlah_premium_facilities', 'jumlah_basic_facilities', 'jumlah_bathroom_modern', 'jumlah_bathroom_traditional', 'jumlah_security_facilities', 'jumlah_shared_facilities', 'jumlah_parking_facilities', 'jumlah_electronic_facilities', 'jumlah_utility_facilities', 'premium_ratio', 'non_premium_ratio', 'netral_ratio']
+location_features = ['latitude', 'longitude', 'jarak_masjid_terdekat', 'jarak_rumah_sakit_terdekat', 'jarak_toserba_terdekat', 'jarak_tempat_makan_terdekat', 'jarak_terminal_terdekat', 'jarak_stasiun_terdekat', 'jarak_kampus_terdekat']
+other_features = ['harga']
+
 def haversine_distance(lat1, lon1, lat2, lon2):
     # handle series datatype
     if isinstance(lat1, pd.Series): lat1 = lat1.iloc[0]
@@ -120,6 +134,29 @@ def create_feature(data):
     # reindex
     return data.reindex(columns=feature_columns)
 
+def get_recommendation(user_data):
+    # transform user preferences
+    user_facility = scaler_facility.transform([[user_data[f].item() for f in facility_features]])
+    user_location = scaler_location.transform([[user_data[f].item() for f in location_features]])
+    user_price = scaler_price.transform([[user_data[f].item() for f in other_features]])
+    print("cek")
+    # get distance for user pref to each data
+    weighted_distances = []
+    for i in range(1473): # static length data based on csv
+        d_facility = euclidean(loaded_facility[i], user_facility[0])
+        d_location = euclidean(loaded_location[i], user_location[0])
+        d_price = euclidean(loaded_price[i], user_price[0])
+
+        total_distance = 0.5 * d_facility + 7.5 * d_location + 2 * d_price
+        weighted_distances.append((i+1, total_distance))
+
+    # get top 10 nearest data
+    sorted_distances = sorted(weighted_distances, key=lambda x: x[1])
+
+    # get id of kost
+    id = [row[0] for row in sorted_distances[:10]]
+
+    return id
 
 @router.post("/price")
 def predict_price(predictModel: schemas.PredictPrice, db: Session = Depends(get_db)):
@@ -147,9 +184,14 @@ def predict_price(predictModel: schemas.PredictPrice, db: Session = Depends(get_
         # create DataFrame and predict
         df = pd.DataFrame([data_dict])
         df = create_feature(df)
-        prediction = model.predict(df)[0]
+        df['harga'] = model.predict(df)[0]
+        # get recommendation after get price
+        id = get_recommendation(df)
 
-        return {'prediksi_harga': int(prediction)}
+        return {
+            'prediksi_harga': int(df['harga']),
+            'id':id
+        }
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
