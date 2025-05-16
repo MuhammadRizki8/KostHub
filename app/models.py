@@ -37,7 +37,7 @@ class Kost(Base):
 
     gambar_kost = relationship("GambarKost",back_populates="kost",cascade="all, delete-orphan",lazy="joined")
     kost_fasilitas = relationship("KostFasilitas", back_populates="kost", cascade="all, delete")
-    favorits = relationship("Favorit", back_populates="kost", cascade="all, delete")
+    favorited_by_users = relationship("Favorites", back_populates="kost", cascade="all, delete")
     fasilitas = relationship("Fasilitas", secondary="kost_fasilitas", backref="kosts")  # Relasi ke fasilitas
     
 class GambarKost(Base):
@@ -67,15 +67,15 @@ class KostFasilitas(Base):
     kost = relationship("Kost", back_populates="kost_fasilitas")
     fasilitas = relationship("Fasilitas", back_populates="kost_fasilitas")
 
-class Favorit(Base):
+class Favorites(Base):
     __tablename__ = 'favorit'
     
     id_favorit = Column(Integer, primary_key=True)
     id_pencari = Column(Integer, ForeignKey('users.id_user', ondelete='CASCADE'), nullable=False)
     id_kost = Column(Integer, ForeignKey('kost.id_kost', ondelete='CASCADE'), nullable=False)
     
-    kost = relationship("Kost", back_populates="favorits")
-    pencari = relationship("User", back_populates="favorits")
+    kost = relationship("Kost", back_populates="favorited_by_users")
+    pencari = relationship("User", back_populates="favorited_kosts")
 
 class User(Base):
     __tablename__ = 'users'
@@ -86,4 +86,4 @@ class User(Base):
     password = Column(Text, nullable=False)
     role = Column(String(10), nullable=False)
     
-    favorits = relationship("Favorit", back_populates="pencari", cascade="all, delete")
+    favorited_kosts = relationship("Favorites", back_populates="pencari", cascade="all, delete")
