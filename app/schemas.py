@@ -131,3 +131,7 @@ class PredictPrice(BaseModel):
     panjang: Optional[float]
     lebar: Optional[float]
     fasilitas: Optional[list[str]]
+
+class FavoriteRequest(BaseModel):
+    id_user: int
+    id_kost: int
