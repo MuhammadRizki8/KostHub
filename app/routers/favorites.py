@@ -8,15 +8,15 @@ router = APIRouter()
 # Add Favorite
 # =======================
 @router.post("/", response_model=dict)
-def add_favorite(id_user: int, id_kost: int, db: Session = Depends(get_db)):
-    existing = db.query(models.Favorites).filter_by(id_pencari=id_user, id_kost=id_kost).first()
+def add_favorite(payload: schemas.FavoriteRequest, db: Session = Depends(get_db)):
+    existing = db.query(models.Favorites).filter_by(id_pencari=payload.id_user, id_kost=payload.id_kost).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": "AlreadyExists", "message": "Favorite already exists"}
         )
 
-    new_fav = models.Favorites(id_pencari=id_user, id_kost=id_kost)
+    new_fav = models.Favorites(id_pencari=payload.id_user, id_kost=payload.id_kost)
     db.add(new_fav)
     db.commit()
     db.refresh(new_fav)
@@ -57,8 +57,8 @@ def get_favorites_by_user(id_user: int, db: Session = Depends(get_db)):
 # Remove Favorite
 # =======================
 @router.delete("/", response_model=dict)
-def remove_favorite(id_user: int, id_kost: int, db: Session = Depends(get_db)):
-    fav = db.query(models.Favorites).filter_by(id_pencari=id_user, id_kost=id_kost).first()
+def remove_favorite(payload: schemas.FavoriteRequest, db: Session = Depends(get_db)):
+    fav = db.query(models.Favorites).filter_by(id_pencari=payload.id_user, id_kost=payload.id_kost).first()
     if not fav:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
