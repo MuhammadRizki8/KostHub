@@ -38,3 +38,14 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
     return user
+
+@router.put("/{user_id}/guide-status", response_model=schemas.UserResponse)
+def update_guide_status(user_id: int, payload: schemas.UpdateGuideStatus, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id_user == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+
+    user.has_seen_guide = payload.has_seen_guide
+    db.commit()
+    db.refresh(user)
+    return user

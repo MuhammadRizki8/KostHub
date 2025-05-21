@@ -39,6 +39,7 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     id_user: int
     role: str
+    has_seen_guide: bool
 
     class Config:
         from_attributes = True
@@ -135,3 +136,6 @@ class PredictPrice(BaseModel):
 class FavoriteRequest(BaseModel):
     id_user: int
     id_kost: int
+
+class UpdateGuideStatus(BaseModel):
+    has_seen_guide: bool
