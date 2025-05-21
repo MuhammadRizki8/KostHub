@@ -39,6 +39,7 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     id_user: int
     role: str
+    has_seen_guide: bool
 
     class Config:
         from_attributes = True
@@ -88,12 +89,12 @@ class KostBase(BaseModel):
     alamat: str
     deskripsi: Optional[str] = None  # Deskripsi boleh NULL
     harga_sewa: condecimal(max_digits=10, decimal_places=2)
-    luas: conint(gt=0)  # Luas tidak boleh 0 atau negatif
+    luas: Optional[int] = Field(default=None, ge=0)  # ge = greater than or equal
+    luas_tanah: Optional[int] = Field(default=None, ge=0)
     panjang: float
     lebar: float
     status_properti: StatusPropertiEnum
     jenis_sertifikat: Optional[JenisSertifikatEnum] = None
-    luas_tanah: Optional[conint(gt=0)] = None
     longitude: float  # Tidak boleh NULL
     latitude: float  # Tidak boleh NULL
 
@@ -135,3 +136,6 @@ class PredictPrice(BaseModel):
 class FavoriteRequest(BaseModel):
     id_user: int
     id_kost: int
+
+class UpdateGuideStatus(BaseModel):
+    has_seen_guide: bool

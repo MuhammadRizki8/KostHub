@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, Enum, Double, Float
+from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, Enum, Double, Float, Boolean  
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 import enum
@@ -85,5 +85,6 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True)
     password = Column(Text, nullable=False)
     role = Column(String(10), nullable=False)
+    has_seen_guide = Column(Boolean, nullable=True)
     
     favorited_kosts = relationship("Favorites", back_populates="pencari", cascade="all, delete")
