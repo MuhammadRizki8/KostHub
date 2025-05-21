@@ -42,7 +42,8 @@ def get_favorites_by_user(id_user: int, db: Session = Depends(get_db)):
             "alamat": fav.kost.alamat,
             "harga_sewa": float(fav.kost.harga_sewa),
             "luas": fav.kost.luas,
-            "fasilitas": [f.nama_fasilitas for f in fav.kost.fasilitas]
+            "fasilitas": [f.nama_fasilitas for f in fav.kost.fasilitas],
+            "gambar": [f.url_gambar for f in fav.kost.gambar_kost]
         } for fav in favs
     ]
 
