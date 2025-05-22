@@ -85,6 +85,6 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True)
     password = Column(Text, nullable=False)
     role = Column(String(10), nullable=False)
-    has_seen_guide = Column(Boolean, nullable=True)
+    has_seen_guide = Column(Boolean, default=False)
     
     favorited_kosts = relationship("Favorites", back_populates="pencari", cascade="all, delete")
